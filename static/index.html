@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ZepCut Studio</title>
+<style>
+  /* DWS colourway - sampled from the logo: navy #15264D, frost #EAEEF5 */
+  :root {
+    --bg:#0b1220; --panel:#121c31; --panel2:#18243d; --line:#22304d;
+    --text:#eaeef5; --dim:#8a96ae; --accent:#3a66b8; --accent-dim:#1c2f55;
+    --ok:#3ecf8e; --warn:#f5a623; --bad:#ef5b5b;
+    --r:10px;
+  }
+  * { box-sizing:border-box; margin:0; }
+  /* buttons do NOT inherit colour by default - without this, any button text
+     that isn't given an explicit colour renders black on the dark panels. */
+  button, input, select { font-family:inherit; color:inherit; }
+  body { background:var(--bg); color:var(--text);
+         font:14px/1.5 "Segoe UI",system-ui,sans-serif; }
+  /* one shared column so header, nav and content line up */
+  .wrap { width:100%; max-width:1180px; margin:0 auto; }
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:5px}
+
+  /* ---------------------------------------------------------- header */
+  header { border-bottom:1px solid var(--line);
+           background:linear-gradient(180deg,#101a2d,#0b1220); }
+  header .wrap { display:flex; align-items:center; gap:16px;
+                 padding:0 24px; height:58px; }
+  .brand { font-size:17px; font-weight:700; letter-spacing:.3px; }
+  .brand span { color:var(--accent); }
+  .grow { flex:1; }
+  .watch { display:flex; align-items:center; gap:10px; padding:6px 12px;
+           border:1px solid var(--line); border-radius:999px; background:var(--panel); }
+  .watch .lbl { color:var(--dim); font-size:13px; }
+  .watch.on { border-color:var(--accent); background:var(--accent-dim); }
+  .watch.on .lbl { color:var(--text); }
+  .switch { position:relative; width:38px; height:21px; flex:none; }
+  .switch input { opacity:0; width:0; height:0; }
+  .slider { position:absolute; inset:0; background:var(--panel2);
+            border:1px solid var(--line); border-radius:22px; cursor:pointer;
+            transition:.15s; }
+  .slider:before { content:""; position:absolute; width:15px; height:15px;
+                   left:2px; top:2px; background:var(--dim); border-radius:50%;
+                   transition:.15s; }
+  input:checked + .slider { background:var(--accent); border-color:var(--accent); }
+  input:checked + .slider:before { transform:translateX(17px); background:#fff; }
+
+  /* ---------------------------------------------------------- nav */
+  nav { border-bottom:1px solid var(--line); }
+  nav .wrap { display:flex; gap:2px; padding:0 24px; }
+  nav button { background:none; border:none; color:var(--dim); padding:12px 16px;
+               font-size:14px; cursor:pointer; border-bottom:2px solid transparent;
+               display:flex; align-items:center; gap:8px; }
+  nav button:hover { color:var(--text); }
+  nav button.active { color:var(--text); border-color:var(--accent); }
+  .badge { background:var(--warn); color:#171003; border-radius:999px;
+           font-size:11px; font-weight:700; padding:1px 7px; line-height:1.5; }
+  .badge.zero { display:none; }
+
+  main { padding:22px 24px 60px; max-width:1180px; margin:0 auto; }
+
+  /* ---------------------------------------------------------- stat cards */
+  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px;
+           margin-bottom:20px; }
+  .stat { background:var(--panel); border:1px solid var(--line);
+          border-radius:var(--r); padding:18px 16px; cursor:pointer;
+          transition:.12s; text-align:center; color:var(--text); }
+  .stat:hover { border-color:var(--accent); background:var(--panel2); }
+  .stat.sel { border-color:var(--accent); background:var(--accent-dim); }
+  /* a count of zero isn't worth clicking - don't invite it */
+  .stat.void { opacity:.45; cursor:default; }
+  .stat.void:hover { border-color:var(--line); background:var(--panel); }
+  .stat .n { font-size:30px; font-weight:700; line-height:1.1;
+             color:var(--text); font-variant-numeric:tabular-nums; }
+  .stat .k { color:var(--dim); font-size:11.5px; text-transform:uppercase;
+             letter-spacing:.9px; margin-top:6px; }
+  .stat.attn .n { color:var(--warn); }
+  .stat.rdy  .n { color:var(--ok); }
+  /* a zero count is not news - mute it so the eye goes to real numbers */
+  .stat .n.zero { color:var(--dim); }
+
+  /* ---------------------------------------------------------- toolbar */
+  .toolbar { display:flex; gap:10px; align-items:center; margin-bottom:12px; }
+  .search { flex:1; max-width:340px; position:relative; }
+  .search input { width:100%; background:var(--panel); color:var(--text);
+                  border:1px solid var(--line); border-radius:8px;
+                  padding:8px 12px 8px 32px; font-size:13.5px; }
+  .search input:focus { outline:none; border-color:var(--accent); }
+  .search:before { content:"⌕"; position:absolute; left:11px; top:6px;
+                   color:var(--dim); font-size:16px; }
+  .count { color:var(--dim); font-size:13px; }
+
+  /* ---------------------------------------------------------- table */
+  .tablewrap { background:var(--panel); border:1px solid var(--line);
+               border-radius:var(--r); overflow:hidden; }
+  table { width:100%; border-collapse:collapse; }
+  th { text-align:left; color:var(--dim); font-weight:600; font-size:11px;
+       text-transform:uppercase; letter-spacing:.7px; padding:11px 16px;
+       background:#0e1726; border-bottom:1px solid var(--line); }
+  td { padding:12px 16px; border-top:1px solid var(--line); vertical-align:middle; }
+  tbody tr:first-child td { border-top:none; }
+  tbody tr:hover { background:#16213a; }
+  .fname { font-weight:500; }
+  .meta { color:var(--dim); font-size:12px; }
+  .right { text-align:right; }
+
+  .chip { display:inline-flex; align-items:center; gap:6px; padding:3px 10px;
+          border-radius:999px; font-size:11.5px; font-weight:600;
+          text-transform:capitalize; }
+  .chip:before { content:""; width:6px; height:6px; border-radius:50%;
+                 background:currentColor; }
+  .chip.unprocessed { background:#1b2439; color:var(--dim); }
+  .chip.ready      { background:#0f2f22; color:var(--ok); }
+  .chip.review     { background:#3a2b10; color:var(--warn); }
+  .chip.processing { background:var(--accent-dim); color:#86b0f5; }
+
+  button.act { background:var(--panel2); color:var(--text);
+               border:1px solid var(--line); border-radius:7px;
+               padding:6px 12px; cursor:pointer; font-size:13px; }
+  button.act:hover { border-color:var(--accent); }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button.primary:hover { filter:brightness(1.12); }
+  .acts { display:flex; gap:7px; justify-content:flex-end; }
+
+  .bar { height:5px; background:#0e1726; border-radius:3px; overflow:hidden;
+         width:150px; margin-left:auto; }
+  .bar i { display:block; height:100%; background:var(--accent); transition:width .4s; }
+  .stage { color:var(--dim); font-size:11.5px; margin-top:4px; text-align:right; }
+
+  .panel { background:var(--panel); border:1px solid var(--line);
+           border-radius:var(--r); padding:18px; margin-bottom:14px; }
+  .panel h3 { font-size:14px; margin-bottom:10px; }
+  pre { background:#0a111d; border:1px solid var(--line); border-radius:8px;
+        padding:14px; overflow:auto; font-size:12.5px; white-space:pre-wrap;
+        max-height:420px; }
+  video { width:100%; max-width:660px; border-radius:8px; background:#000; }
+  .cutrow { display:flex; align-items:center; gap:12px; padding:9px 4px;
+            border-top:1px solid var(--line); }
+  .cutrow label { flex:1; cursor:pointer; }
+  .cutrow .t { color:var(--dim); font-size:12.5px; }
+  .field { display:flex; align-items:center; gap:10px; margin:9px 0; }
+  .field label { width:230px; color:var(--dim); font-size:13.5px; }
+  .field input { background:#0a111d; color:var(--text); border:1px solid var(--line);
+                 border-radius:7px; padding:7px 10px; width:120px; }
+  .field input:focus { outline:none; border-color:var(--accent); }
+  .hint { color:var(--dim); font-size:12.5px; margin-top:8px; line-height:1.6; }
+  .sel { background:#0a111d; color:var(--text); border:1px solid var(--line);
+         border-radius:7px; padding:7px 10px; font-size:13.5px; min-width:220px; }
+  .sel:focus { outline:none; border-color:var(--accent); }
+  .empty { color:var(--dim); padding:48px 20px; text-align:center; }
+  .empty b { color:var(--text); display:block; margin-bottom:6px; font-size:15px; }
+  .assets span { margin-right:18px; }
+  .dot { display:inline-block; width:8px; height:8px; border-radius:50%;
+         margin-right:6px; }
+
+  /* ---------------------------------------------------------- modal */
+  .modal { position:fixed; inset:0; background:#060b14cc; display:none;
+           align-items:center; justify-content:center; padding:40px; z-index:50; }
+  .modal.show { display:flex; }
+  .modal .box { background:var(--panel); border:1px solid var(--line);
+                border-radius:12px; width:min(820px,100%); max-height:100%;
+                display:flex; flex-direction:column; }
+  .modal .top { display:flex; align-items:center; gap:12px; padding:14px 18px;
+                border-bottom:1px solid var(--line); }
+  .modal .top h3 { flex:1; font-size:14px; }
+  .modal .body { padding:18px; overflow:auto; }
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div class="brand">Zep<span>Cut</span> Studio</div>
+  <div class="grow"></div>
+  <label class="watch" id="watchWrap">
+    <span class="lbl">Auto-process new recordings</span>
+    <span class="switch"><input type="checkbox" id="watchToggle">
+    <span class="slider"></span></span>
+  </label>
+</div></header>
+<nav><div class="wrap">
+  <button data-tab="library" class="active">Library</button>
+  <button data-tab="review">Review <span class="badge zero" id="navReview">0</span></button>
+  <button data-tab="graphics">Graphics</button>
+  <button data-tab="settings">Settings</button>
+</div></nav>
+<main>
+  <div id="tab-library">
+    <div class="stats">
+      <button class="stat attn" data-f="review"><div class="n" id="sReview">0</div>
+        <div class="k">Needs review</div></button>
+      <button class="stat rdy" data-f="ready"><div class="n" id="sReady">0</div>
+        <div class="k">Ready</div></button>
+      <button class="stat" data-f="unprocessed"><div class="n" id="sUnproc">0</div>
+        <div class="k">Unprocessed</div></button>
+      <button class="stat" data-f="processing"><div class="n" id="sProc">0</div>
+        <div class="k">Processing</div></button>
+    </div>
+
+    <div class="toolbar">
+      <div class="search"><input id="q" placeholder="Filter by filename…"></div>
+      <div class="grow"></div>
+      <span class="count" id="libCount"></span>
+      <button class="act" id="clearFilter" style="display:none">Clear filter</button>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th>Recording</th><th style="width:90px">Size</th>
+          <th style="width:130px">Status</th><th style="width:80px">Score</th>
+          <th style="width:260px" class="right">Action</th>
+        </tr></thead>
+        <tbody id="libRows"></tbody>
+      </table>
+      <div class="empty" id="libEmpty" style="display:none"></div>
+    </div>
+  </div>
+
+  <div id="tab-review" style="display:none">
+    <div id="reviewList"></div>
+    <div id="reviewDetail" style="display:none">
+      <div class="panel">
+        <h3 id="rvTitle"></h3>
+        <video id="rvPlayer" controls preload="metadata"></video>
+        <div class="hint">Previewing: <span id="rvPreviewLabel">edited result</span></div>
+      </div>
+      <div class="panel">
+        <h3>Proposed cuts &mdash; untick anything you want to keep</h3>
+        <div id="rvCuts"></div>
+        <div style="margin-top:16px; display:flex; gap:10px">
+          <button class="act primary" id="rvApply">Apply selected cuts &rarr; Ready</button>
+          <button class="act" id="rvBack">Back</button>
+        </div>
+      </div>
+      <div class="panel"><h3>Report</h3><pre id="rvReport"></pre></div>
+    </div>
+  </div>
+
+  <div id="tab-graphics" style="display:none">
+    <div class="panel" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div>
+        <div class="meta" style="margin-bottom:4px">Series project</div>
+        <select id="projSel" class="sel"></select>
+      </div>
+      <div class="grow"></div>
+      <label class="watch" id="gfxWrap">
+        <span class="lbl">Place graphics after editing</span>
+        <span class="switch"><input type="checkbox" id="gfxToggle">
+        <span class="slider"></span></span>
+      </label>
+      <button class="act" id="replanAll">Rebuild all plans</button>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th style="width:46px">Ep</th><th>Title</th>
+          <th style="width:80px">Script</th><th style="width:90px">Assets</th>
+          <th style="width:90px">Placed</th><th style="width:90px">Unused</th>
+          <th style="width:110px" class="right">Plan</th>
+        </tr></thead>
+        <tbody id="gfxRows"></tbody>
+      </table>
+      <div class="empty" id="gfxEmpty" style="display:none">
+        <b>No project configured</b>Edit <b>projects.json</b> in the zepcut
+        folder to point at a series.</div>
+    </div>
+    <div class="hint" id="gfxPaths"></div>
+  </div>
+
+  <div id="tab-settings" style="display:none">
+    <div class="panel">
+      <h3>Editing thresholds</h3>
+      <div id="cfgFields"></div>
+      <button class="act primary" id="cfgSave" style="margin-top:12px">Save settings</button>
+      <div class="hint">Changes apply to the next edit. The most useful knobs are
+        <b>max_pause</b> (how long a thinking-pause may be before it gets
+        shortened) and <b>review_threshold</b>.</div>
+    </div>
+    <div class="panel assets">
+      <h3>Branding assets</h3>
+      <div id="assetList"></div>
+      <div class="hint">Drop intro.mp4, outro.mp4, watermark.png into the
+        <b>zepcut\assets</b> folder. Missing ones are skipped automatically.</div>
+    </div>
+  </div>
+</main>
+
+<div class="modal" id="repModal"><div class="box">
+  <div class="top"><h3 id="repTitle">Report</h3>
+    <button class="act" id="repClose">Close</button></div>
+  <div class="body"><pre id="repBody"></pre></div>
+</div></div>
+
+<div class="modal" id="planModal"><div class="box">
+  <div class="top"><h3 id="planTitle">Placement plan</h3>
+    <button class="act" id="planClose">Close</button></div>
+  <div class="body" id="planBody"></div>
+</div></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const CFG_LABELS = {
+  silence_db:"Silence threshold (dB)", min_silence:"Min silence (s)",
+  max_pause:"Max pause kept (s)", kept_pause:"Pause shortened to (s)",
+  review_threshold:"Review threshold (score)", target_i:"Loudness target (LUFS)",
+  video_qp:"Video quality (QP, lower=better)", watermark_opacity:"Watermark opacity",
+  intro_min_duration:"Min length for intro/outro (s)", min_duration:"Min clip length (s)",
+};
+let state=null, currentReview=null, cfgDirty=false, filter=null, query="";
+
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach(x => x.classList.remove("active"));
+  b.classList.add("active");
+  ["library","review","graphics","settings"].forEach(t =>
+    $("#tab-"+t).style.display = (t === b.dataset.tab ? "" : "none"));
+  if (b.dataset.tab === "graphics") loadProjects();
+});
+
+document.querySelectorAll(".stat").forEach(s => s.onclick = () => {
+  filter = (filter === s.dataset.f) ? null : s.dataset.f;
+  renderLibrary();
+});
+$("#q").oninput = e => { query = e.target.value.trim().toLowerCase(); renderLibrary(); };
+$("#clearFilter").onclick = () => {
+  filter = null; query = ""; $("#q").value = ""; renderLibrary();
+};
+
+async function api(path, body) {
+  const opt = body ? {method:"POST", body:JSON.stringify(body)} : {};
+  const r = await fetch(path, opt);
+  return r.json();
+}
+const fmtScore = s => s == null ? "&mdash;" : s + "<span class='meta'>/100</span>";
+const ago = t => {
+  const d = (Date.now()/1000 - t);
+  if (d < 3600) return Math.max(1,Math.round(d/60)) + "m ago";
+  if (d < 86400) return Math.round(d/3600) + "h ago";
+  return Math.round(d/86400) + "d ago";
+};
+
+function renderLibrary() {
+  if (!state) return;
+  const lib = state.library;
+  const n = k => lib.filter(v => v.status === k).length;
+  const setStat = (sel, val) => {
+    const el = $(sel);
+    el.textContent = val;
+    el.classList.toggle("zero", val === 0);   // mute zeros, highlight real counts
+  };
+  setStat("#sReview", n("review"));
+  setStat("#sReady",  n("ready"));
+  setStat("#sUnproc", n("unprocessed"));
+  setStat("#sProc",   n("processing"));
+  const nav = $("#navReview");
+  nav.textContent = n("review");
+  nav.classList.toggle("zero", n("review") === 0);
+  // A card with nothing in it is not worth clicking - filtering to an empty
+  // list and then explaining the wrong reason is just confusing.
+  document.querySelectorAll(".stat").forEach(s => {
+    s.classList.toggle("sel", s.dataset.f === filter);
+    const empty = n(s.dataset.f) === 0;
+    s.classList.toggle("void", empty && s.dataset.f !== filter);
+    s.disabled = empty;
+  });
+
+  let rows = lib;
+  if (filter) rows = rows.filter(v => v.status === filter);
+  if (query)  rows = rows.filter(v => v.name.toLowerCase().includes(query));
+
+  $("#libCount").textContent =
+    rows.length === lib.length ? `${lib.length} recordings`
+                               : `${rows.length} of ${lib.length}`;
+  $("#clearFilter").style.display = (filter || query) ? "" : "none";
+
+  const tb = $("#libRows"); tb.innerHTML = "";
+  const emptyBox = $("#libEmpty");
+  emptyBox.style.display = rows.length ? "none" : "";
+  if (!rows.length) {
+    // say why THIS list is empty, not why a library in general might be
+    const LABEL = {review:"waiting for review", ready:"ready",
+                   unprocessed:"unprocessed", processing:"processing"};
+    if (filter && query)
+      emptyBox.innerHTML = `<b>No match</b>Nothing ${LABEL[filter]} matches
+        &ldquo;${query}&rdquo;.`;
+    else if (filter)
+      emptyBox.innerHTML = `<b>Nothing ${LABEL[filter]}</b>` + (
+        filter === "processing" ? "No edit is running right now."
+        : filter === "review"   ? "Nothing was flagged for a second look."
+        : filter === "ready"    ? "No finished edits yet."
+        : "Everything in your library has been processed.");
+    else if (query)
+      emptyBox.innerHTML = `<b>No match</b>No recording is called
+        &ldquo;${query}&rdquo;.`;
+    else
+      emptyBox.innerHTML = `<b>Nothing here yet</b>Drop an OBS recording into
+        your Videos folder and it will appear.`;
+  }
+  for (const v of rows) {
+    const job = state.jobs[v.stem];
+    let action = "";
+    if (v.status === "processing" && job) {
+      action = `<div class="bar"><i style="width:${job.pct}%"></i></div>
+                <div class="stage">${job.stage} ${job.pct ? job.pct+"%" : ""}</div>`;
+    } else if (v.status === "unprocessed") {
+      action = `<div class="acts">
+        <button class="act primary" onclick="editFile('${v.stem}')">Edit</button></div>`;
+    } else {
+      action = `<div class="acts">
+        <button class="act" onclick="showReport('${v.stem}')">Report</button>
+        <button class="act" onclick="editFile('${v.stem}')">Re-edit</button>`;
+      if (v.status === "review")
+        action += `<button class="act primary" onclick="openReview('${v.stem}')">Review</button>`;
+      action += `</div>`;
+    }
+    if (job && job.error)
+      action += `<div class="stage" style="color:var(--bad)">${job.error}</div>`;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td><div class="fname">${v.name}</div>
+        <div class="meta">${ago(v.mtime)}</div></td>
+      <td class="meta">${v.size_mb} MB</td>
+      <td><span class="chip ${v.status}">${v.status}</span></td>
+      <td>${fmtScore(v.score)}</td>
+      <td class="right">${action}</td>`;
+    tb.appendChild(tr);
+  }
+}
+
+function renderReviewList() {
+  const list = $("#reviewList");
+  const inReview = state.library.filter(v => v.status === "review");
+  if (currentReview) { list.style.display = "none"; return; }
+  list.style.display = ""; $("#reviewDetail").style.display = "none";
+  list.innerHTML = inReview.length ? "" :
+    `<div class="panel empty"><b>Nothing waiting</b>
+     Videos land here when ZepCut's confidence score falls below the review
+     threshold. Everything else goes straight to Ready.</div>`;
+  for (const v of inReview) {
+    const d = document.createElement("div");
+    d.className = "panel";
+    d.style.cssText = "display:flex;align-items:center;gap:14px";
+    d.innerHTML = `<div style="flex:1"><div class="fname">${v.name}</div>
+        <div class="meta">confidence ${v.score}/100 &middot; ${ago(v.mtime)}</div></div>
+      <button class="act primary" onclick="openReview('${v.stem}')">Review cuts</button>`;
+    list.appendChild(d);
+  }
+}
+
+async function openReview(stem) {
+  currentReview = stem;
+  document.querySelector('nav button[data-tab="review"]').click();
+  $("#reviewList").style.display = "none";
+  $("#reviewDetail").style.display = "";
+  $("#rvTitle").textContent = stem;
+  $("#rvPlayer").src = `/video/review/${encodeURIComponent(stem)}.mp4`;
+  $("#rvPreviewLabel").textContent = "edited result";
+  const cuts = await api(`/api/cuts/${encodeURIComponent(stem)}`);
+  const rep  = await api(`/api/report/${encodeURIComponent(stem)}`);
+  $("#rvReport").textContent = rep.report || "(no report)";
+  const box = $("#rvCuts"); box.innerHTML = "";
+  (cuts.cuts || []).forEach((c,i) => {
+    const mmss = t => { const m=Math.floor(t/60), s=(t%60).toFixed(1);
+                        return `${m}:${s.padStart(4,"0")}`; };
+    const row = document.createElement("div");
+    row.className = "cutrow";
+    row.innerHTML = `
+      <input type="checkbox" id="cut${i}" checked>
+      <label for="cut${i}">${c.kind}
+        <span class="t"> &nbsp; ${mmss(c.start)} &ndash; ${mmss(c.end)}
+        (removes ${(c.end-c.start).toFixed(1)}s)</span></label>
+      <button class="act" onclick="preview('${stem}', ${i})">Preview</button>`;
+    box.appendChild(row);
+  });
+}
+
+async function preview(stem, i) {
+  $("#rvPreviewLabel").textContent = `cut #${i+1} with 1.5s context (from the original)`;
+  const r = await api("/api/snippet", {stem, index:i});
+  if (r.url) { const p = $("#rvPlayer"); p.src = r.url; p.play(); }
+}
+
+$("#rvApply").onclick = async () => {
+  const keep = [];
+  document.querySelectorAll("#rvCuts input").forEach((cb,i) => { if (cb.checked) keep.push(i); });
+  await api("/api/apply", {stem:currentReview, keep});
+  currentReview = null;
+  document.querySelector('nav button[data-tab="library"]').click();
+};
+$("#rvBack").onclick = () => { currentReview = null; renderReviewList(); };
+
+async function editFile(stem) { await api("/api/edit", {file:stem}); poll(); }
+
+async function showReport(stem) {
+  const r = await api(`/api/report/${encodeURIComponent(stem)}`);
+  $("#repTitle").textContent = stem;
+  $("#repBody").textContent = r.report || r.error || "(no report)";
+  $("#repModal").classList.add("show");
+}
+$("#repClose").onclick = () => $("#repModal").classList.remove("show");
+$("#repModal").onclick = e => { if (e.target.id === "repModal") $("#repClose").click(); };
+addEventListener("keydown", e => { if (e.key === "Escape") $("#repClose").click(); });
+
+/* ------------------------------------------------------- graphics tab */
+let proj = null;
+
+async function loadProjects() {
+  proj = await api("/api/projects");
+  const sel = $("#projSel");
+  sel.innerHTML = Object.entries(proj.projects)
+    .map(([k,v]) => `<option value="${k}"${k===proj.active?" selected":""}>${v}</option>`)
+    .join("") || `<option>(none configured)</option>`;
+  $("#gfxToggle").checked = proj.graphics_enabled;
+  $("#gfxWrap").classList.toggle("on", proj.graphics_enabled);
+  $("#gfxPaths").innerHTML = proj.project
+    ? `scripts: <b>${proj.project.scripts}</b><br>episodes: <b>${proj.project.episodes}</b>`
+    : "";
+  const tb = $("#gfxRows"); tb.innerHTML = "";
+  $("#gfxEmpty").style.display = proj.episodes.length ? "none" : "";
+  for (const e of proj.episodes) {
+    const full = e.assets > 0 && e.unused.length === 0;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><b>${String(e.n).padStart(2,"0")}</b></td>
+      <td><div class="fname">${e.title}</div>
+          <div class="meta">${e.folder}</div></td>
+      <td>${e.script ? '<span class="chip ready">yes</span>'
+                     : '<span class="chip review">missing</span>'}</td>
+      <td>${e.assets}</td>
+      <td style="color:${full ? "var(--ok)" : "var(--text)"}">${e.placed}</td>
+      <td>${e.unused.length
+            ? `<span title="${e.unused.join('\n')}">${e.unused.length}</span>`
+            : '<span class="meta">—</span>'}</td>
+      <td class="right"><div class="acts">
+        <button class="act" onclick="showPlan(${e.n})">View</button>
+        <button class="act" onclick="replan(${e.n})">Rebuild</button>
+      </div></td>`;
+    tb.appendChild(tr);
+  }
+}
+
+function showPlan(n) {
+  const e = proj.episodes.find(x => x.n === n);
+  if (!e) return;
+  $("#planTitle").textContent = `EP${String(n).padStart(2,"0")} — ${e.title}`;
+  const rows = e.events.map(ev => `
+    <div class="cutrow" style="display:block">
+      <div><b>${ev.asset}</b>
+        <span class="chip ${ev.placement==="overlay"?"processing":"unprocessed"}"
+              style="margin-left:8px">${ev.placement}</span></div>
+      <div class="meta" style="margin-top:4px">cue (line ${ev.line}): ${ev.cue}</div>
+      <div class="meta">anchor: &ldquo;${ev.anchor}&rdquo;</div>
+    </div>`).join("");
+  const unused = e.unused.length
+    ? `<div class="panel" style="margin-top:14px"><h3>Rendered but not placed</h3>
+       ${e.unused.map(u=>`<div class="meta">${u}</div>`).join("")}
+       <div class="hint">Add a trigger phrase in <b>cue_map.py</b> to place these.</div></div>`
+    : "";
+  $("#planBody").innerHTML =
+    (rows || `<div class="empty">No plan yet. Hit Rebuild.</div>`) + unused;
+  $("#planModal").classList.add("show");
+}
+
+async function replan(n) {
+  const r = await api("/api/replan", {episode: n});
+  await loadProjects();
+  if (!r.ok) alert(r.out || r.error);
+}
+$("#replanAll").onclick = async () => {
+  $("#replanAll").textContent = "Rebuilding…";
+  await api("/api/replan", {episode: "all"});
+  $("#replanAll").textContent = "Rebuild all plans";
+  loadProjects();
+};
+$("#projSel").onchange = async e => {
+  await api("/api/projects", {active: e.target.value});
+  loadProjects();
+};
+$("#gfxToggle").onchange = async e => {
+  await api("/api/projects", {graphics_enabled: e.target.checked});
+  $("#gfxWrap").classList.toggle("on", e.target.checked);
+};
+$("#planClose").onclick = () => $("#planModal").classList.remove("show");
+$("#planModal").onclick = e => { if (e.target.id==="planModal") $("#planClose").click(); };
+
+function renderSettings() {
+  if (cfgDirty) return;
+  const box = $("#cfgFields");
+  if (!box.dataset.built) {
+    box.dataset.built = "1";
+    for (const k of Object.keys(state.config)) {
+      const f = document.createElement("div");
+      f.className = "field";
+      f.innerHTML = `<label>${CFG_LABELS[k] || k}</label>
+        <input id="cfg_${k}" type="number" step="any">`;
+      box.appendChild(f);
+      $("#cfg_"+k).oninput = () => cfgDirty = true;
+    }
+  }
+  for (const [k,v] of Object.entries(state.config)) $("#cfg_"+k).value = v;
+  $("#assetList").innerHTML = ["intro","outro","watermark"].map(k =>
+    `<span><i class="dot" style="background:${state.assets[k] ? "var(--ok)" : "var(--line)"}"></i>${k}: ${state.assets[k] ? "found" : "not present"}</span>`).join("");
+}
+
+$("#cfgSave").onclick = async () => {
+  const body = {};
+  for (const k of Object.keys(state.config)) body[k] = parseFloat($("#cfg_"+k).value);
+  await api("/api/config", body);
+  cfgDirty = false;
+};
+
+$("#watchToggle").onchange = e => {
+  api("/api/watch", {on:e.target.checked});
+  $("#watchWrap").classList.toggle("on", e.target.checked);
+};
+
+async function poll() {
+  try {
+    state = await api("/api/state");
+    renderLibrary(); renderReviewList(); renderSettings();
+    const ae = document.activeElement;
+    if (!ae || ae.tagName !== "INPUT" || ae.type === "checkbox") {
+      $("#watchToggle").checked = state.watch;
+      $("#watchWrap").classList.toggle("on", state.watch);
+    }
+  } catch (e) { /* server restarting */ }
+}
+poll();
+setInterval(poll, 2000);
+</script>
+</body>
+</html>
